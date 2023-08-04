@@ -1,0 +1,9 @@
+# VSCode
+.vscode
+
+# Python
+__pycache__
+src.egg-info
+
+# Data
+data/raw
