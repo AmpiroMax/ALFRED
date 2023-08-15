@@ -45,9 +45,10 @@ class MultyModalGPT2Embedder:
         # TODO:
         # - if there no embs but still token in text
         #   remove token or raise a error
-        text_token_ids = self.tokenizer(
-            text, return_tensors="pt", padding=True
-        )["input_ids"].to(self.device)
+        tokens = self.tokenizer(text, return_tensors="pt", padding=True)
+        text_token_ids = tokens["input_ids"].to(self.device)
+        # attention_mask = tokens["attention_mask"]
+
         img_token_place = (text_token_ids[0] == self.img_token_id).nonzero(
             as_tuple=True)[0]
         state_token_place = (
@@ -122,7 +123,8 @@ class MultyModalGPT2Embedder:
         rigth_embs = self.token2emb(text_token_ids[:, data_place + 1:])
 
         times = left_embs.shape[0] // data_embs.shape[0]
-        data_embs = torch.tile(data_embs, (times, 1, 1))
+        data_embs = torch.tile(data_embs, (times, 1))
+
         text_embs_with_data_embs = torch.concat(
             [left_embs, data_embs, rigth_embs], dim=1)
 
@@ -206,14 +208,53 @@ class MultyModalGPT2(Module):
 
         self.feats2emb = nn.Sequential(
             nn.Conv2d(cfg.model_cfg.imgs_feats_size[0], 1, 1),
-            View((-1, img_tokens_dim)),
-            nn.Linear(img_tokens_dim, self.token2emb.embedding_dim),
-            View((-1, img_tokens_num, self.token2emb.embedding_dim))
+            View((-1, img_tokens_dim * img_tokens_num)),
+            nn.Linear(
+                img_tokens_dim * img_tokens_num,
+                self.token2emb.embedding_dim
+            ),
+            View((-1, 1, self.token2emb.embedding_dim))
         ).to(cfg.device)
 
-    def forward(self, input_data: dict):
-        img_embs = self.feats2emb(input_data["images_features"])
+    def set_bias_training(self) -> None:
+        for name, param in self.gpt.named_parameters():
+            if name.split(".")[-1] == "bias":
+                param.requires_grad = True
+            else:
+                param.requires_grad = False
 
+        for _, param in self.feats2emb.named_parameters():
+            param.requires_grad = True
+
+        self.gpt.eval()
+        self.feats2emb.train()
+
+    def set_adapter_training(self) -> None:
+        for _, param in self.gpt.named_parameters():
+            param.requires_grad = False
+
+        for _, param in self.feats2emb.named_parameters():
+            param.requires_grad = True
+
+        self.gpt.eval()
+        self.feats2emb.train()
+
+    def get_trainable_params(self) -> tp.List:
+        trainable_params = []
+        for param in self.gpt.parameters():
+            if param.requires_grad:
+                trainable_params += [param]
+
+        for param in self.feats2emb.parameters():
+            if param.requires_grad:
+                trainable_params += [param]
+
+        return trainable_params
+
+    def forward(self, input_data: dict):
+        img_embs = None
+        if input_data["images_features"] is not None:
+            img_embs = self.feats2emb(input_data["images_features"])
         promt_embs, promt_ids = self.mmtokenizer(
             text=input_data["promts"],
             img_embs=img_embs
