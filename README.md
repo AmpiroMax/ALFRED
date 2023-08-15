@@ -1,6 +1,8 @@
 # Alfred GPT2-E
 
-Example of working pipeline can be found in [`playyard.ipynb`](https://github.com/AmpiroMax/ALFRED/blob/main/notebooks/playyard.ipynb)
+Working [logs](https://docs.google.com/document/d/1RVssDQyAO-8jfgcC-kY6-eZ2wPJJo7qPwIsL6474PtU/edit)
+
+Example of pipeline can be found in [`playyard.ipynb`](https://github.com/AmpiroMax/ALFRED/blob/main/notebooks/playyard.ipynb)
 
 Used models:
 
