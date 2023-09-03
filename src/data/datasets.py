@@ -13,6 +13,8 @@ PROMT_TYPES = [
     "task2low_actions",
     "instruction2low_actions",
     "instruction_img2next_step",
+    "task2next_step",
+    "instruction2next_step"
 ]
 
 
@@ -124,6 +126,45 @@ class AlfredDataset(Dataset):
             "targets": data_sample["actions"]
         }
 
+    def _promt_task2next_step(self, data_sample: dict):
+        promts = []
+
+        for task_idx in range(len(data_sample["tasks"])):
+            for i, _ in enumerate(data_sample["actions"]):
+                task = data_sample["tasks"][task_idx]
+                prev_actions = ". ".join(data_sample["actions"][:i])
+                promt = f"{self.bos_token}Task: {task}. Your previous actions: {prev_actions}. What is you next step?{self.eos_token}"
+                promts.append(promt)
+
+        data_size = min(10,  len(data_sample["actions"]))
+        promts = promts[:data_size]
+        actions = data_sample["actions"][:data_size]
+        return {
+            "promts": promts,
+            "images_features": None,
+            "targets": actions
+        }
+
+    def _promt_instruction2next_step(self, data_sample: dict):
+        promts = []
+
+        for instruction_idx in range(len(data_sample["instructions"])):
+            for i, _ in enumerate(data_sample["actions"]):
+                instruction = data_sample["instructions"][instruction_idx]
+                prev_actions = ". ".join(data_sample["actions"][:i])
+                promt = f"{self.bos_token}Task: {instruction}. Your previous actions: {prev_actions}. What is you next step?{self.eos_token}"
+                promts.append(promt)
+
+        data_size = min(10,  len(data_sample["actions"]))
+        promts = promts[:data_size]
+        actions = data_sample["actions"][:data_size]
+
+        return {
+            "promts": promts,
+            "images_features": None,
+            "targets": actions
+        }
+
     def __getitem__(self, index) -> dict:
         sample_path = self.data_path + self.data_folders_names[index]
         data_sample = self._get_data_sample(sample_path)
@@ -133,7 +174,11 @@ class AlfredDataset(Dataset):
         elif self.promt_type == "instruction2low_actions":
             promt = self._promt_instruction2low_actions(data_sample)
         elif self.promt_type == "instruction_img2next_step":
-            promt = self. _promt_instruction_img2next_step(data_sample)
+            promt = self._promt_instruction_img2next_step(data_sample)
+        elif self.promt_type == "task2next_step":
+            promt = self._promt_task2next_step(data_sample)
+        elif self.promt_type == "instruction2next_step":
+            promt = self._promt_instruction2next_step(data_sample)
         return promt
 
     def __len__(self):
